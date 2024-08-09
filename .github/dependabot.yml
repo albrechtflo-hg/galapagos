@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/ui"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "@angular*"
+ 
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
