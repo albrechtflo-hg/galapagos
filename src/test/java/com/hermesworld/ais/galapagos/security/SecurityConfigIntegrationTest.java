@@ -1,15 +1,18 @@
 package com.hermesworld.ais.galapagos.security;
 
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.hermesworld.ais.galapagos.applications.ApplicationsService;
 import com.hermesworld.ais.galapagos.applications.controller.ApplicationsController;
 import com.hermesworld.ais.galapagos.kafka.KafkaClusters;
 import com.hermesworld.ais.galapagos.security.config.GalapagosSecurityProperties;
 import com.hermesworld.ais.galapagos.staging.StagingService;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -22,14 +25,19 @@ import java.net.URI;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import java.util.Objects;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(classes = { SecurityConfig.class, ApplicationsController.class,
         GalapagosSecurityProperties.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@EnableAutoConfiguration(exclude = OAuth2ClientAutoConfiguration.class)
+@EnableAutoConfiguration
 class SecurityConfigIntegrationTest {
 
     @LocalServerPort
@@ -53,6 +61,21 @@ class SecurityConfigIntegrationTest {
     @MockBean
     private JwtDecoder jwtDecoder;
 
+    @RegisterExtension
+    static WireMockExtension wm = WireMockExtension.newInstance()
+            .options(wireMockConfig().dynamicPort().globalTemplating(true)).build();
+
+    @BeforeAll
+    static void initWireMock() {
+        WireMockRuntimeInfo info = wm.getRuntimeInfo();
+        System.setProperty("spring.security.oauth2.client.provider.keycloak.issuer-uri",
+                "http://localhost:" + info.getHttpPort() + "/auth");
+
+        wm.stubFor(get("/auth/.well-known/openid-configuration").willReturn(
+                aResponse().withStatus(200).withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .withBodyFile("oauth2/openid-configuration.json")));
+    }
+
     @BeforeEach
     void initJwtStuff() {
         when(jwtDecoder.decode(any())).thenAnswer(inv -> {
@@ -65,9 +88,14 @@ class SecurityConfigIntegrationTest {
 
     @Test
     void test_apiAccessProtected() {
+        var factory = restTemplate.getRestTemplate().getRequestFactory();
+        System.out.println(factory);
         ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:" + port + "/api/me/requests",
                 String.class);
-        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.getStatusCode().value());
+        // must redirect to Spring's "login" page
+        assertEquals(HttpStatus.FOUND.value(), response.getStatusCode().value());
+        assertTrue(Objects.requireNonNull(response.getHeaders().getFirst(HttpHeaders.LOCATION))
+                .endsWith("/oauth2/authorization/keycloak"));
     }
 
     @Test

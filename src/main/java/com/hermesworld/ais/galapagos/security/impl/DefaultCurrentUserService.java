@@ -4,8 +4,11 @@ import com.hermesworld.ais.galapagos.events.EventContextSource;
 import com.hermesworld.ais.galapagos.security.AuditPrincipal;
 import com.hermesworld.ais.galapagos.security.CurrentUserService;
 import com.hermesworld.ais.galapagos.security.config.GalapagosSecurityProperties;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +28,9 @@ public class DefaultCurrentUserService implements CurrentUserService, EventConte
     @Override
     public Optional<String> getCurrentUserName() {
         SecurityContext context = SecurityContextHolder.getContext();
-        if (context.getAuthentication() == null || context.getAuthentication().getPrincipal() == null) {
+        if (context.getAuthentication() == null || context.getAuthentication().getPrincipal() == null
+                || !context.getAuthentication().isAuthenticated()
+                || context.getAuthentication() instanceof AnonymousAuthenticationToken) {
             return Optional.empty();
         }
 
@@ -34,21 +39,27 @@ public class DefaultCurrentUserService implements CurrentUserService, EventConte
 
     @Override
     public Optional<AuditPrincipal> getCurrentPrincipal() {
-        return getAuthenticationToken()
-                .map(t -> new AuditPrincipal(t.getToken().getClaimAsString(securityConfig.getJwtUserNameClaim()),
-                        t.getToken().getClaimAsString(securityConfig.getJwtDisplayNameClaim())));
+        return getCurrentUserName().map(name -> new AuditPrincipal(name, getCurrentUserDisplayName().orElse(null)));
     }
 
     @Override
     public Optional<String> getCurrentUserEmailAddress() {
-        return getAuthenticationToken()
-                .map(token -> token.getToken().getClaimAsString(securityConfig.getJwtEmailClaim()));
+        return extractClaimFromAuthentication(securityConfig.getJwtEmailClaim());
     }
 
-    private Optional<JwtAuthenticationToken> getAuthenticationToken() {
+    @Override
+    public Optional<String> getCurrentUserDisplayName() {
+        return extractClaimFromAuthentication(securityConfig.getJwtDisplayNameClaim());
+    }
+
+    private Optional<String> extractClaimFromAuthentication(String claim) {
         SecurityContext context = SecurityContextHolder.getContext();
-        if (context.getAuthentication() instanceof JwtAuthenticationToken token) {
-            return Optional.of(token);
+        Authentication auth = context.getAuthentication();
+        if (auth instanceof JwtAuthenticationToken token) {
+            return Optional.ofNullable(token.getToken().getClaimAsString(claim));
+        }
+        if (auth instanceof OAuth2AuthenticationToken oauth2) {
+            return Optional.ofNullable(oauth2.getPrincipal().getAttribute(claim));
         }
 
         return Optional.empty();

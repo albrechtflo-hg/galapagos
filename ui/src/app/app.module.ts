@@ -7,7 +7,6 @@ import { LanguageTranslationModule } from './shared/modules/language-translation
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
-import { AuthGuard } from './shared';
 
 import { ApplicationsService } from './shared/services/applications.service';
 import { EnvironmentsService } from './shared/services/environments.service';
@@ -20,10 +19,6 @@ import { getHighlightLanguages } from './layout/topics/topics.module';
 import { ApiKeyService } from './shared/services/apikey.service';
 import { CertificateService } from './shared/services/certificates.service';
 
-import { OAuthModule, OAuthService } from 'angular-oauth2-oidc';
-
-const isApiUrl = (url: string) => !url.startsWith('http') && url.indexOf('/api/') > -1;
-
 @NgModule({
     imports: [
         CommonModule,
@@ -31,17 +26,11 @@ const isApiUrl = (url: string) => !url.startsWith('http') && url.indexOf('/api/'
         BrowserAnimationsModule,
         HttpClientModule,
         LanguageTranslationModule,
-        AppRoutingModule,
-        OAuthModule.forRoot({
-            resourceServer: {
-                sendAccessToken: true,
-                customUrlValidation: isApiUrl
-            }
-        })
+        AppRoutingModule
     ],
     declarations: [AppComponent],
-    providers: [AuthGuard, ApplicationsService, EnvironmentsService, TopicsService, ApiKeyService, ToastService, CertificateService,
-        ServerInfoService, OAuthService,
+    providers: [ApplicationsService, EnvironmentsService, TopicsService, ApiKeyService, ToastService, CertificateService,
+        ServerInfoService,
         {
             provide: HIGHLIGHT_OPTIONS,
             useValue: {

@@ -10,6 +10,8 @@ public interface CurrentUserService {
 
     Optional<String> getCurrentUserEmailAddress();
 
+    Optional<String> getCurrentUserDisplayName();
+
     /**
      * Checks from the Security Context, if the current user has the role of an Administrator
      *

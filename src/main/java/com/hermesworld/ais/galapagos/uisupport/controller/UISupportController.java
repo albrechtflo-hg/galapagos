@@ -12,6 +12,7 @@ import com.hermesworld.ais.galapagos.kafka.auth.KafkaAuthenticationModule;
 import com.hermesworld.ais.galapagos.kafka.config.KafkaEnvironmentConfig;
 import com.hermesworld.ais.galapagos.kafka.util.KafkaTopicConfigHelper;
 import com.hermesworld.ais.galapagos.naming.NamingService;
+import com.hermesworld.ais.galapagos.security.CurrentUserService;
 import com.hermesworld.ais.galapagos.topics.config.GalapagosTopicConfig;
 import com.hermesworld.ais.galapagos.topics.service.TopicService;
 import com.hermesworld.ais.galapagos.util.CertificateUtil;
@@ -62,6 +63,8 @@ public class UISupportController {
 
     private final CustomLinksConfig customLinksConfig;
 
+    private final CurrentUserService currentUserService;
+
     private static final Supplier<ResponseStatusException> badRequest = () -> new ResponseStatusException(
             HttpStatus.BAD_REQUEST);
 
@@ -78,7 +81,8 @@ public class UISupportController {
 
     public UISupportController(ApplicationsService applicationsService, TopicService topicService,
             KafkaClusters kafkaClusters, NamingService namingService, GalapagosTopicConfig topicConfig,
-            CustomLinksConfig customLinksConfig, GalapagosChangesConfig changesConfig) {
+            CustomLinksConfig customLinksConfig, GalapagosChangesConfig changesConfig,
+            CurrentUserService currentUserService) {
         this.applicationsService = applicationsService;
         this.topicService = topicService;
         this.kafkaClusters = kafkaClusters;
@@ -86,6 +90,31 @@ public class UISupportController {
         this.topicConfig = topicConfig;
         this.customLinksConfig = customLinksConfig;
         this.changesConfig = changesConfig;
+        this.currentUserService = currentUserService;
+    }
+
+    /**
+     * Returns info about the currently logged-in user ("me"). This can be used for displaying purposes and determining
+     * general availability of UI elements. Note that e.g. the "admin" role is still checked on every API invocation
+     * requiring admin rights.
+     *
+     * @return Info about the currently logged-in user, or HTTP 404 if no user info could be determined.
+     */
+    @GetMapping(value = "/api/me", produces = MediaType.APPLICATION_JSON_VALUE)
+    public UserInfoDto getCurrentUserInfo(@RequestParam(required = false) boolean returnEmpty) {
+        if (currentUserService.getCurrentUserName().isEmpty()) {
+            if (returnEmpty) {
+                return new UserInfoDto();
+            }
+            throw notFound.get();
+        }
+        UserInfoDto dto = new UserInfoDto();
+
+        dto.setDisplayName(currentUserService.getCurrentUserDisplayName().orElse(null));
+        dto.setUserName(currentUserService.getCurrentUserName().orElse(null));
+        dto.setAdmin(currentUserService.isAdmin());
+        dto.setEmailAddress(currentUserService.getCurrentUserEmailAddress().orElse(null));
+        return dto;
     }
 
     /**

@@ -137,6 +137,7 @@ class TopicServiceImplIntegrationTest {
         when(auth.getPrincipal()).thenReturn(new Object());
         when(auth.getName()).thenReturn("testUser");
         when(securityContext.getAuthentication()).thenReturn(auth);
+        when(auth.isAuthenticated()).thenReturn(true);
         SecurityContextHolder.setContext(securityContext);
 
         service.markTopicDeprecated("topic-1", "deprecated", LocalDate.of(2999, 1, 1)).get();
@@ -173,6 +174,7 @@ class TopicServiceImplIntegrationTest {
 
         when(auth.getPrincipal()).thenReturn(new Object());
         when(auth.getName()).thenReturn("testUser");
+        when(auth.isAuthenticated()).thenReturn(true);
         when(securityContext.getAuthentication()).thenReturn(auth);
         SecurityContextHolder.setContext(securityContext);
 

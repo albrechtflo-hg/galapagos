@@ -1,33 +1,28 @@
-import { Injectable } from '@angular/core';
-import { ActivatedRouteSnapshot, Router, RouterStateSnapshot } from '@angular/router';
+import { ActivatedRouteSnapshot, CanActivateFn } from '@angular/router';
 import { AuthService } from '../services/auth.service';
-import { firstValueFrom, map } from 'rxjs';
+import { inject } from '@angular/core';
 
+const AUTH_RELOAD_KEY = '__auth_reload';
 
-@Injectable()
-export class AuthGuard  {
-
-    constructor(private router: Router, private authService: AuthService) {
+export const canActivateRoute: CanActivateFn = async (route: ActivatedRouteSnapshot) => {
+    if (!route.url.length) {
+        return Promise.resolve(true);
     }
+    const authService: AuthService = inject(AuthService);
+    const authenticated = await authService.checkAuthenticated();
+    const reloadFlag = localStorage.getItem(AUTH_RELOAD_KEY);
+    localStorage.removeItem(AUTH_RELOAD_KEY);
 
-    async canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): Promise<boolean> {
-        const authenticated = await this.authService.tryLoginFromData();
-
-        if (!authenticated) {
-            this.authService.showBounceBubbles.next(true);
-            return this.authService.login(state.url);
+    if (!authenticated) {
+        // if in local dev mode, do a gentle redirect to the login page
+        if (window.location.host.startsWith('localhost:')) {
+            window.location.href = '/oauth2/authorization/keycloak';
+        } else if (!reloadFlag) {
+            localStorage.setItem(AUTH_RELOAD_KEY, 'true');
+            window.location.reload();
         }
-
-        const requiredRoles: string[] = route.data.roles;
-
-        if (!requiredRoles || requiredRoles.length === 0) {
-            return Promise.resolve(true);
-        }
-        return this.checkRoles(requiredRoles);
+        return Promise.resolve(false);
     }
 
-    private checkRoles(requiredRoles: string[]): Promise<boolean> {
-        return firstValueFrom(this.authService.roles.pipe(map(roles => requiredRoles.every(role => roles.indexOf(role) > -1))));
-    }
-
-}
+    return Promise.resolve(authenticated);
+};

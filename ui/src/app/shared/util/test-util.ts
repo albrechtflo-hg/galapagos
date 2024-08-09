@@ -5,12 +5,6 @@ export class MockAuthService {
 
     admin: Observable<boolean> = of(false);
 
-    userProfile: Observable<UserProfile> = of({ userName: '', displayName: '' });
-
-    roles: Observable<string[]> = of([]);
-
-    async login(): Promise<boolean> {
-        return Promise.resolve(true);
-    }
+    userProfile: Observable<UserProfile> = of({ userName: '', displayName: '', emailAddress: '', admin: false });
 
 }

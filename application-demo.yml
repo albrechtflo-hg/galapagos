@@ -2,7 +2,7 @@ server:
   port: 8080
 
 info:
-  galapagos.instanceName: "Local DEMO"
+  "galapagos.instanceName": "Local DEMO"
 
 spring:
   mail:
